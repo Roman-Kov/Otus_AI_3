@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 .env
 agent.log
+api_stdout.log
+api_stderr.log
 .pytest_cache/
 .ruff_cache/
 *.egg-info/
