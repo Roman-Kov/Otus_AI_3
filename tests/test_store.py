@@ -70,6 +70,12 @@ def test_reset_restarts_ids(s):
     assert s.add("Книга Б")["id"] == 1
 
 
+def test_reset_on_fresh_db(tmp_path):
+    s = BookStore(str(tmp_path / "fresh.db"))
+    s.reset()
+    assert s.stats() == {"total": 0}
+
+
 def test_persistence_across_instances(tmp_path):
     db = str(tmp_path / "books.db")
     BookStore(db).add("Пикник на обочине")
