@@ -22,6 +22,11 @@ def test_create_user_empty_name_422():
     assert r.status_code == 422
 
 
+def test_create_user_slash_in_name_422():
+    r = client.post("/users", json={"name": "a/b"})
+    assert r.status_code == 422
+
+
 def test_get_by_name_found_and_404():
     client.post("/users", json={"name": "Bob"})
     r = client.get("/users/Bob")

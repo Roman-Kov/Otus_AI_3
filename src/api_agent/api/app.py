@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .store import UserStore
 
@@ -12,6 +12,15 @@ VALID_STATUSES = {"active", "blocked"}
 class CreateUserIn(BaseModel):
     name: str = Field(min_length=1)
     email: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def reject_slash(cls, v: str) -> str:
+        # '/' запрещён: имя адресуется через path-параметр, %2F декодируется
+        # до маршрутизации и имя становится недостижимым.
+        if "/" in v:
+            raise ValueError("имя не может содержать символ '/'")
+        return v
 
 
 class UpdateStatusIn(BaseModel):

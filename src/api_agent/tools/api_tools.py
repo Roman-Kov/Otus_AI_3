@@ -1,5 +1,6 @@
 import json
 import logging
+from urllib.parse import quote
 
 import httpx
 from langchain_core.tools import tool
@@ -57,7 +58,7 @@ def create_user(name: str, email: str | None = None) -> str:
 @tool
 def get_users_by_name(name: str) -> str:
     """Найти пользователей по имени. Возвращает список всех совпадений."""
-    return _request("GET", f"/users/{name}")
+    return _request("GET", f"/users/{quote(name, safe='')}")
 
 
 @tool
@@ -66,7 +67,7 @@ def update_user_status_by_name(name: str, status: str) -> str:
 
     Работает только если пользователь с таким именем ровно один.
     """
-    return _request("PATCH", f"/users/{name}/status", json={"status": status})
+    return _request("PATCH", f"/users/{quote(name, safe='')}/status", json={"status": status})
 
 
 @tool

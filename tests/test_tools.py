@@ -47,6 +47,20 @@ def test_cyrillic_name_roundtrip(api_server, api_url):
     assert found["data"][0]["name"] == "Иван"
 
 
+def test_name_with_special_chars_roundtrip(api_server, api_url):
+    parsed = _parse(create_user.invoke({"name": "a?b c"}))
+    assert parsed["status"] == "success"
+    found = _parse(get_users_by_name.invoke({"name": "a?b c"}))
+    assert found["status"] == "success"
+    assert found["data"][0]["name"] == "a?b c"
+
+
+def test_create_name_with_slash_returns_422(api_server, api_url):
+    parsed = _parse(create_user.invoke({"name": "a/b"}))
+    assert parsed["status"] == "error"
+    assert parsed["http_status"] == 422
+
+
 def test_connection_error_returns_structured_error(api_server, monkeypatch):
     monkeypatch.setenv("AGENT_API_BASE_URL", "http://127.0.0.1:9")
     get_settings.cache_clear()
