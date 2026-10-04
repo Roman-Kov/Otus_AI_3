@@ -391,7 +391,14 @@ def update_user_status(name: str, payload: UpdateStatusIn) -> dict:
             status_code=409,
             detail={"message": f"имя '{name}' неоднозначно", "users": matches},
         )
-    return store.update_status(name, payload.status) or matches[0]
+    updated = store.update_status(name, payload.status)
+    if updated is None:
+        # Гонка: между find_by_name и update_status появился дубликат имени.
+        raise HTTPException(
+            status_code=409,
+            detail={"message": f"имя '{name}' неоднозначно", "users": store.find_by_name(name)},
+        )
+    return updated
 
 
 @app.get("/stats")
