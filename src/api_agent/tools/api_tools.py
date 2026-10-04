@@ -18,7 +18,7 @@ def _result(response: httpx.Response) -> str:
     try:
         data = response.json()
     except ValueError:
-        data = response.text
+        data = response.text or None
     errors = f"HTTP {response.status_code}: {data}" if response.is_error else None
     result = {
         "status": "error" if response.is_error else "success",
@@ -47,39 +47,45 @@ def _request(method: str, path: str, **kwargs: object) -> str:
 
 
 @tool
-def create_user(name: str, email: str | None = None) -> str:
-    """Создать пользователя с заданным именем (email необязателен).
+def add_book(title: str) -> str:
+    """Добавить книгу в каталог по названию.
 
-    Возвращает данные созданного пользователя и флаг duplicate=true, если имя уже существовало.
+    Возвращает данные созданной книги. Если название уже есть в каталоге — ошибку 409.
     """
-    return _request("POST", "/users", json={"name": name, "email": email})
+    return _request("POST", "/books", json={"title": title})
 
 
 @tool
-def get_users_by_name(name: str) -> str:
-    """Найти пользователей по имени. Возвращает список всех совпадений."""
-    return _request("GET", f"/users/{quote(name, safe='')}")
+def get_book_by_title(title: str) -> str:
+    """Найти книгу по названию. Возвращает данные книги."""
+    return _request("GET", f"/books/{quote(title, safe='')}")
 
 
 @tool
-def update_user_status_by_name(name: str, status: str) -> str:
-    """Изменить статус пользователя ('active' или 'blocked') по имени.
+def rename_book(title: str, new_title: str) -> str:
+    """Переименовать книгу.
 
-    Работает только если пользователь с таким именем ровно один.
+    Текущее название должно существовать, новое — быть свободным (иначе 409).
     """
-    return _request("PATCH", f"/users/{quote(name, safe='')}/status", json={"status": status})
+    return _request("PATCH", f"/books/{quote(title, safe='')}", json={"new_title": new_title})
 
 
 @tool
-def list_users() -> str:
-    """Получить список всех пользователей."""
-    return _request("GET", "/users")
+def delete_book(title: str) -> str:
+    """Удалить книгу из каталога по названию."""
+    return _request("DELETE", f"/books/{quote(title, safe='')}")
 
 
 @tool
-def get_user_stats() -> str:
-    """Получить статистику: сколько всего, активных и заблокированных пользователей."""
+def list_books() -> str:
+    """Получить список всех книг каталога."""
+    return _request("GET", "/books")
+
+
+@tool
+def get_catalog_stats() -> str:
+    """Получить статистику каталога: сколько всего книг."""
     return _request("GET", "/stats")
 
 
-API_TOOLS = [create_user, get_users_by_name, update_user_status_by_name, list_users, get_user_stats]
+API_TOOLS = [add_book, get_book_by_title, rename_book, delete_book, list_books, get_catalog_stats]

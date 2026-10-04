@@ -2,11 +2,12 @@ import json
 
 from api_agent.config import get_settings
 from api_agent.tools.api_tools import (
-    create_user,
-    get_user_stats,
-    get_users_by_name,
-    list_users,
-    update_user_status_by_name,
+    add_book,
+    delete_book,
+    get_book_by_title,
+    get_catalog_stats,
+    list_books,
+    rename_book,
 )
 
 
@@ -14,57 +15,60 @@ def _parse(raw: str) -> dict:
     return json.loads(raw)
 
 
-def test_create_user_success(api_server, api_url):
-    parsed = _parse(create_user.invoke({"name": "Alex"}))
+def test_add_book_success(api_server, api_url):
+    parsed = _parse(add_book.invoke({"title": "Мастер и Маргарита"}))
     assert parsed["status"] == "success"
     assert parsed["http_status"] == 201
-    assert parsed["data"]["name"] == "Alex"
-    assert parsed["data"]["duplicate"] is False
+    assert parsed["data"]["title"] == "Мастер и Маргарита"
     assert parsed["errors"] is None
 
 
-def test_get_users_by_name_not_found(api_server, api_url):
-    parsed = _parse(get_users_by_name.invoke({"name": "Nobody"}))
+def test_add_book_duplicate_409(api_server, api_url):
+    add_book.invoke({"title": "Война и мир"})
+    parsed = _parse(add_book.invoke({"title": "Война и мир"}))
+    assert parsed["status"] == "error"
+    assert parsed["http_status"] == 409
+    assert parsed["data"] is None
+    assert parsed["errors"] is not None
+
+
+def test_get_book_not_found(api_server, api_url):
+    parsed = _parse(get_book_by_title.invoke({"title": "Призрак"}))
     assert parsed["status"] == "error"
     assert parsed["http_status"] == 404
     assert parsed["data"] is None
     assert parsed["errors"] is not None
 
 
-def test_update_status_and_stats(api_server, api_url):
-    create_user.invoke({"name": "Alex"})
-    parsed = _parse(update_user_status_by_name.invoke({"name": "Alex", "status": "blocked"}))
+def test_rename_book_success(api_server, api_url):
+    add_book.invoke({"title": "Мы"})
+    parsed = _parse(rename_book.invoke({"title": "Мы", "new_title": "Мы (замятин)"}))
     assert parsed["status"] == "success"
-    assert parsed["data"]["status"] == "blocked"
-    stats = _parse(get_user_stats.invoke({}))
-    assert stats["data"] == {"total": 1, "active": 0, "blocked": 1}
+    assert parsed["data"]["title"] == "Мы (замятин)"
 
 
-def test_cyrillic_name_roundtrip(api_server, api_url):
-    parsed = _parse(create_user.invoke({"name": "Иван", "email": "ivan@mail.ru"}))
+def test_delete_book_204_and_stats(api_server, api_url):
+    add_book.invoke({"title": "Тихий Дон"})
+    parsed = _parse(delete_book.invoke({"title": "Тихий Дон"}))
     assert parsed["status"] == "success"
-    found = _parse(get_users_by_name.invoke({"name": "Иван"}))
-    assert found["data"][0]["name"] == "Иван"
+    assert parsed["http_status"] == 204
+    assert parsed["data"] is None
+    stats = _parse(get_catalog_stats.invoke({}))
+    assert stats["data"] == {"total": 0}
 
 
-def test_name_with_special_chars_roundtrip(api_server, api_url):
-    parsed = _parse(create_user.invoke({"name": "a?b c"}))
+def test_cyrillic_and_special_chars_roundtrip(api_server, api_url):
+    title = "Что делать? (чернышевский)"
+    parsed = _parse(add_book.invoke({"title": title}))
     assert parsed["status"] == "success"
-    found = _parse(get_users_by_name.invoke({"name": "a?b c"}))
-    assert found["status"] == "success"
-    assert found["data"][0]["name"] == "a?b c"
-
-
-def test_create_name_with_slash_returns_422(api_server, api_url):
-    parsed = _parse(create_user.invoke({"name": "a/b"}))
-    assert parsed["status"] == "error"
-    assert parsed["http_status"] == 422
+    found = _parse(get_book_by_title.invoke({"title": title}))
+    assert found["data"]["title"] == title
 
 
 def test_connection_error_returns_structured_error(api_server, monkeypatch):
     monkeypatch.setenv("AGENT_API_BASE_URL", "http://127.0.0.1:9")
     get_settings.cache_clear()
-    parsed = _parse(list_users.invoke({}))
+    parsed = _parse(list_books.invoke({}))
     assert parsed["status"] == "error"
     assert parsed["http_status"] is None
     assert "connection" in parsed["errors"].lower()
