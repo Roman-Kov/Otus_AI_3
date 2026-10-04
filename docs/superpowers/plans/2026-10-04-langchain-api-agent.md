@@ -522,6 +522,12 @@ def reset_store():
     yield
 
 
+@pytest.fixture(autouse=True)
+def clear_settings_cache():
+    yield
+    get_settings.cache_clear()
+
+
 @pytest.fixture(scope="session")
 def api_server():
     config = uvicorn.Config(app, host="127.0.0.1", port=API_PORT, log_level="warning")
