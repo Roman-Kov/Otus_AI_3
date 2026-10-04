@@ -43,11 +43,11 @@ class UserStore:
     def stats(self) -> dict:
         with self._lock:
             users = list(self._users.values())
-        return {
-            "total": len(users),
-            "active": sum(1 for u in users if u["status"] == "active"),
-            "blocked": sum(1 for u in users if u["status"] == "blocked"),
-        }
+            return {
+                "total": len(users),
+                "active": sum(1 for u in users if u["status"] == "active"),
+                "blocked": sum(1 for u in users if u["status"] == "blocked"),
+            }
 
     def reset(self) -> None:
         with self._lock:
