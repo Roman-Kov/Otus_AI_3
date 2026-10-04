@@ -1,44 +1,77 @@
-from api_agent.api.store import UserStore
+import pytest
+
+from api_agent.api.store import BookStore, ConflictError, NotFoundError
 
 
-def test_create_and_duplicate():
-    s = UserStore()
-    u, dup = s.create("Alex", None)
-    assert u["name"] == "Alex"
-    assert u["status"] == "active"
-    assert u["id"] == 1
-    assert dup is False
-    _, dup2 = s.create("Alex", None)
-    assert dup2 is True
+@pytest.fixture()
+def s(tmp_path):
+    return BookStore(str(tmp_path / "books.db"))
 
 
-def test_find_by_name():
-    s = UserStore()
-    s.create("Bob", None)
-    s.create("Bob", None)
-    assert len(s.find_by_name("Bob")) == 2
-    assert s.find_by_name("Nope") == []
+def test_add_and_find(s):
+    book = s.add("Мастер и Маргарита")
+    assert book["title"] == "Мастер и Маргарита"
+    assert book["id"] == 1
+    assert book["created_at"]
+    assert s.find_by_title("Мастер и Маргарита") == book
+    assert s.find_by_title("Нет такой") is None
 
 
-def test_update_status_single_and_ambiguous():
-    s = UserStore()
-    s.create("Carl", None)
-    updated = s.update_status("Carl", "blocked")
-    assert updated["status"] == "blocked"
-    s.create("Carl", None)
-    assert s.update_status("Carl", "active") is None
+def test_add_duplicate_raises_conflict(s):
+    s.add("Война и мир")
+    with pytest.raises(ConflictError):
+        s.add("Война и мир")
 
 
-def test_stats():
-    s = UserStore()
-    s.create("A", None)
-    s.create("B", None)
-    s.update_status("B", "blocked")
-    assert s.stats() == {"total": 2, "active": 1, "blocked": 1}
+def test_rename(s):
+    s.add("Война и мир")
+    renamed = s.rename("Война и мир", "Война и мир (сокращённая)")
+    assert renamed["title"] == "Война и мир (сокращённая)"
+    assert renamed["id"] == 1
+    assert s.find_by_title("Война и мир") is None
+    assert s.find_by_title("Война и мир (сокращённая)") is not None
 
 
-def test_reset():
-    s = UserStore()
-    s.create("X", None)
+def test_rename_not_found(s):
+    with pytest.raises(NotFoundError):
+        s.rename("Призрак", "Другое")
+
+
+def test_rename_conflict(s):
+    s.add("Книга А")
+    s.add("Книга Б")
+    with pytest.raises(ConflictError):
+        s.rename("Книга А", "Книга Б")
+
+
+def test_delete(s):
+    s.add("Книга А")
+    s.delete("Книга А")
+    assert s.find_by_title("Книга А") is None
+    assert s.stats() == {"total": 0}
+
+
+def test_delete_not_found(s):
+    with pytest.raises(NotFoundError):
+        s.delete("Призрак")
+
+
+def test_all_and_stats(s):
+    s.add("Книга А")
+    s.add("Книга Б")
+    assert [b["title"] for b in s.all()] == ["Книга А", "Книга Б"]
+    assert s.stats() == {"total": 2}
+
+
+def test_reset_restarts_ids(s):
+    s.add("Книга А")
     s.reset()
-    assert s.stats()["total"] == 0
+    assert s.stats() == {"total": 0}
+    assert s.add("Книга Б")["id"] == 1
+
+
+def test_persistence_across_instances(tmp_path):
+    db = str(tmp_path / "books.db")
+    BookStore(db).add("Пикник на обочине")
+    second = BookStore(db)
+    assert second.find_by_title("Пикник на обочине") is not None

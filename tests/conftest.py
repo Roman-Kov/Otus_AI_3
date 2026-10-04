@@ -5,7 +5,6 @@ import httpx
 import pytest
 import uvicorn
 
-from api_agent.api.app import app, store
 from api_agent.config import get_settings
 
 API_PORT = 8977
@@ -14,7 +13,13 @@ API_URL = f"http://127.0.0.1:{API_PORT}"
 
 @pytest.fixture(autouse=True)
 def reset_store():
-    store.reset()
+    try:
+        from api_agent.api.app import store
+    except ImportError:
+        # B2-лимбо: store.py уже книжный, app.py ещё users-домен (чинится в B3)
+        store = None
+    if store is not None:
+        store.reset()
     yield
 
 
@@ -26,6 +31,8 @@ def clear_settings_cache():
 
 @pytest.fixture(scope="session")
 def api_server():
+    from api_agent.api.app import app
+
     config = uvicorn.Config(app, host="127.0.0.1", port=API_PORT, log_level="warning")
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, daemon=True)
