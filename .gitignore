@@ -10,3 +10,5 @@ api_stderr.log
 *.egg-info/
 dist/
 build/
+books.db
+.test-books.db

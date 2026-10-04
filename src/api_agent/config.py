@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     llm_model: str = "qwen2.5:3b"
     ollama_base_url: str = "http://localhost:11434"
     api_base_url: str = "http://localhost:8001"
+    db_path: str = "books.db"
 
 
 @lru_cache
