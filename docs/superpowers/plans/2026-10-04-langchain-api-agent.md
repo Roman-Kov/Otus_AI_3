@@ -289,6 +289,11 @@ def test_create_user_empty_name_422():
     assert r.status_code == 422
 
 
+def test_create_user_slash_in_name_422():
+    r = client.post("/users", json={"name": "a/b"})
+    assert r.status_code == 422
+
+
 def test_get_by_name_found_and_404():
     client.post("/users", json={"name": "Bob"})
     r = client.get("/users/Bob")
@@ -339,7 +344,7 @@ def test_list_users():
 
 ```python
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .store import UserStore
 
@@ -352,6 +357,15 @@ VALID_STATUSES = {"active", "blocked"}
 class CreateUserIn(BaseModel):
     name: str = Field(min_length=1)
     email: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def reject_slash(cls, v: str) -> str:
+        # '/' запрещён: имя адресуется через path-параметр, %2F декодируется
+        # до маршрутизации и имя становится недостижимым.
+        if "/" in v:
+            raise ValueError("имя не может содержать символ '/'")
+        return v
 
 
 class UpdateStatusIn(BaseModel):
@@ -409,7 +423,7 @@ def get_stats() -> dict:
 - [ ] **Step 5: Прогнать — PASS**
 
 `.\.venv\Scripts\python -m pytest tests/test_api.py -v`
-Ожидание: 7 passed.
+Ожидание: 8 passed.
 
 - [ ] **Step 6: Smoke — поднять сервер вручную и стукнуться**
 
@@ -603,6 +617,20 @@ def test_cyrillic_name_roundtrip(api_server, api_url):
     assert found["data"][0]["name"] == "Иван"
 
 
+def test_name_with_special_chars_roundtrip(api_server, api_url):
+    parsed = _parse(create_user.invoke({"name": "a?b c"}))
+    assert parsed["status"] == "success"
+    found = _parse(get_users_by_name.invoke({"name": "a?b c"}))
+    assert found["status"] == "success"
+    assert found["data"][0]["name"] == "a?b c"
+
+
+def test_create_name_with_slash_returns_422(api_server, api_url):
+    parsed = _parse(create_user.invoke({"name": "a/b"}))
+    assert parsed["status"] == "error"
+    assert parsed["http_status"] == 422
+
+
 def test_connection_error_returns_structured_error(api_server, monkeypatch):
     monkeypatch.setenv("AGENT_API_BASE_URL", "http://127.0.0.1:9")
     get_settings.cache_clear()
@@ -639,6 +667,7 @@ from api_agent.tools.api_tools import (
 ```python
 import json
 import logging
+from urllib.parse import quote
 
 import httpx
 from langchain_core.tools import tool
@@ -696,7 +725,7 @@ def create_user(name: str, email: str | None = None) -> str:
 @tool
 def get_users_by_name(name: str) -> str:
     """Найти пользователей по имени. Возвращает список всех совпадений."""
-    return _request("GET", f"/users/{name}")
+    return _request("GET", f"/users/{quote(name, safe='')}")
 
 
 @tool
@@ -705,7 +734,7 @@ def update_user_status_by_name(name: str, status: str) -> str:
 
     Работает только если пользователь с таким именем ровно один.
     """
-    return _request("PATCH", f"/users/{name}/status", json={"status": status})
+    return _request("PATCH", f"/users/{quote(name, safe='')}/status", json={"status": status})
 
 
 @tool
@@ -725,11 +754,11 @@ API_TOOLS = [create_user, get_users_by_name, update_user_status_by_name, list_us
 
 - [ ] **Step 5: PASS**
 
-`.\.venv\Scripts\python -m pytest tests/test_tools.py -v` — 5 passed.
+`.\.venv\Scripts\python -m pytest tests/test_tools.py -v` — 7 passed.
 
 - [ ] **Step 6: Полный прогон**
 
-`.\.venv\Scripts\python -m pytest -v` — 18 passed (5 store + 7 api + 1 config + 5 tools).
+`.\.venv\Scripts\python -m pytest -v` — 21 passed (5 store + 8 api + 1 config + 7 tools).
 
 - [ ] **Step 7: Commit**
 
@@ -953,7 +982,7 @@ git commit -m "feat: CLI-точка входа с проверкой контр�
 ## Операции API
 | Метод | Endpoint | Описание |
 |---|---|---|
-| POST | `/users` `{name, email?}` | создать; `duplicate: true` если имя уже было |
+| POST | `/users` `{name, email?}` | создать; `duplicate: true` если имя уже было; `/` в имени запрещён (422) |
 | GET | `/users/{name}` | список совпадений; 404 если пусто |
 | PATCH | `/users/{name}/status` `{status}` | 200 если имя уникально; 409 если несколько; 404 если нет |
 | GET | `/users` | все пользователи |
@@ -1089,7 +1118,7 @@ git commit -m "docs: README, список промптов, каркас отч�
 
 - [ ] **Step 5: Финальные проверки**
 
-- `.\.venv\Scripts\python -m pytest -v` — все passed (21)
+- `.\.venv\Scripts\python -m pytest -v` — все passed (24)
 - `.\.venv\Scripts\python -m ruff check .` — без ошибок
 - `git status` — `.env` и `agent.log` не отслеживаются; убедиться, что нигде нет ключей (их и не должно быть)
 
