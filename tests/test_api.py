@@ -5,64 +5,65 @@ from api_agent.api.app import app
 client = TestClient(app)
 
 
-def test_create_user_201_and_duplicate_flag():
-    r1 = client.post("/users", json={"name": "Alex"})
-    assert r1.status_code == 201
-    body = r1.json()
-    assert body["name"] == "Alex"
-    assert body["status"] == "active"
-    assert body["duplicate"] is False
-    r2 = client.post("/users", json={"name": "Alex"})
-    assert r2.status_code == 201
-    assert r2.json()["duplicate"] is True
+def test_add_book_201():
+    r = client.post("/books", json={"title": "Мастер и Маргарита"})
+    assert r.status_code == 201
+    body = r.json()
+    assert body["title"] == "Мастер и Маргарита"
+    assert body["id"] == 1
+    assert body["created_at"]
 
 
-def test_create_user_empty_name_422():
-    r = client.post("/users", json={"name": ""})
-    assert r.status_code == 422
-
-
-def test_create_user_slash_in_name_422():
-    r = client.post("/users", json={"name": "a/b"})
-    assert r.status_code == 422
-
-
-def test_get_by_name_found_and_404():
-    client.post("/users", json={"name": "Bob"})
-    r = client.get("/users/Bob")
-    assert r.status_code == 200
-    assert [u["name"] for u in r.json()] == ["Bob"]
-    assert client.get("/users/Nobody").status_code == 404
-
-
-def test_patch_status_success_409_404():
-    client.post("/users", json={"name": "Carl"})
-    r = client.patch("/users/Carl/status", json={"status": "blocked"})
-    assert r.status_code == 200
-    assert r.json()["status"] == "blocked"
-
-    client.post("/users", json={"name": "Carl"})
-    r = client.patch("/users/Carl/status", json={"status": "active"})
+def test_add_book_duplicate_409():
+    client.post("/books", json={"title": "Война и мир"})
+    r = client.post("/books", json={"title": "Война и мир"})
     assert r.status_code == 409
-    assert "users" in r.json()["detail"]
-
-    assert client.patch("/users/Ghost/status", json={"status": "blocked"}).status_code == 404
 
 
-def test_patch_invalid_status_422():
-    client.post("/users", json={"name": "Dan"})
-    r = client.patch("/users/Dan/status", json={"status": "deleted"})
-    assert r.status_code == 422
+def test_add_book_invalid_422():
+    assert client.post("/books", json={"title": ""}).status_code == 422
+    assert client.post("/books", json={"title": "а/б"}).status_code == 422
 
 
-def test_stats():
-    client.post("/users", json={"name": "A"})
-    client.post("/users", json={"name": "B"})
-    client.patch("/users/B/status", json={"status": "blocked"})
-    assert client.get("/stats").json() == {"total": 2, "active": 1, "blocked": 1}
+def test_get_book_200_404():
+    client.post("/books", json={"title": "Мы"})
+    r = client.get("/books/Мы")
+    assert r.status_code == 200
+    assert r.json()["title"] == "Мы"
+    assert client.get("/books/Призрак").status_code == 404
 
 
-def test_list_users():
-    client.post("/users", json={"name": "Ann"})
-    r = client.get("/users")
-    assert [u["name"] for u in r.json()] == ["Ann"]
+def test_rename_book_200_404_409():
+    client.post("/books", json={"title": "Мы"})
+    r = client.patch("/books/Мы", json={"new_title": "Мы (замятин)"})
+    assert r.status_code == 200
+    assert r.json()["title"] == "Мы (замятин)"
+
+    assert client.patch("/books/Призрак", json={"new_title": "X"}).status_code == 404
+
+    client.post("/books", json={"title": "Занято"})
+    r = client.patch("/books/Мы (замятин)", json={"new_title": "Занято"})
+    assert r.status_code == 409
+
+
+def test_rename_invalid_422():
+    client.post("/books", json={"title": "Мы"})
+    assert client.patch("/books/Мы", json={"new_title": ""}).status_code == 422
+    assert client.patch("/books/Мы", json={"new_title": "а/б"}).status_code == 422
+
+
+def test_delete_book_204_404():
+    client.post("/books", json={"title": "Мы"})
+    r = client.delete("/books/Мы")
+    assert r.status_code == 204
+    assert r.content == b""
+    assert client.get("/books/Мы").status_code == 404
+    assert client.delete("/books/Мы").status_code == 404
+
+
+def test_list_books_and_stats():
+    client.post("/books", json={"title": "А"})
+    client.post("/books", json={"title": "Б"})
+    assert [b["title"] for b in client.get("/books").json()] == ["А", "Б"]
+    client.delete("/books/А")
+    assert client.get("/stats").json() == {"total": 1}

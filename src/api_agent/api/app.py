@@ -1,73 +1,74 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
-from .store import UserStore
+from .store import BookStore, ConflictError, NotFoundError
 
-app = FastAPI(title="Users API", version="0.1.0")
-store = UserStore()
-
-VALID_STATUSES = {"active", "blocked"}
+app = FastAPI(title="Books Catalog API", version="0.2.0")
+store = BookStore()
 
 
-class CreateUserIn(BaseModel):
-    name: str = Field(min_length=1)
-    email: str | None = None
+def _reject_slash(v: str) -> str:
+    # '/' запрещён: название адресуется через path-параметр
+    if "/" in v:
+        raise ValueError("название не может содержать символ '/'")
+    return v
 
-    @field_validator("name")
+
+class BookTitleIn(BaseModel):
+    title: str = Field(min_length=1)
+
+    @field_validator("title")
     @classmethod
     def reject_slash(cls, v: str) -> str:
-        # '/' запрещён: имя адресуется через path-параметр, %2F декодируется
-        # до маршрутизации и имя становится недостижимым.
-        if "/" in v:
-            raise ValueError("имя не может содержать символ '/'")
-        return v
+        return _reject_slash(v)
 
 
-class UpdateStatusIn(BaseModel):
-    status: str
+class NewTitleIn(BaseModel):
+    new_title: str = Field(min_length=1)
+
+    @field_validator("new_title")
+    @classmethod
+    def reject_slash(cls, v: str) -> str:
+        return _reject_slash(v)
 
 
-@app.post("/users", status_code=201)
-def create_user(payload: CreateUserIn) -> dict:
-    user, duplicate = store.create(payload.name, payload.email)
-    return {**user, "duplicate": duplicate}
+@app.post("/books", status_code=201)
+def add_book(payload: BookTitleIn) -> dict:
+    try:
+        return store.add(payload.title)
+    except ConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
-@app.get("/users")
-def list_users() -> list[dict]:
+@app.get("/books")
+def list_books() -> list[dict]:
     return store.all()
 
 
-@app.get("/users/{name}")
-def get_user_by_name(name: str) -> list[dict]:
-    matches = store.find_by_name(name)
-    if not matches:
-        raise HTTPException(status_code=404, detail=f"пользователь '{name}' не найден")
-    return matches
+@app.get("/books/{title}")
+def get_book_by_title(title: str) -> dict:
+    book = store.find_by_title(title)
+    if book is None:
+        raise HTTPException(status_code=404, detail=f"книга '{title}' не найдена")
+    return book
 
 
-@app.patch("/users/{name}/status")
-def update_user_status(name: str, payload: UpdateStatusIn) -> dict:
-    if payload.status not in VALID_STATUSES:
-        raise HTTPException(
-            status_code=422, detail="status должен быть 'active' или 'blocked'"
-        )
-    matches = store.find_by_name(name)
-    if not matches:
-        raise HTTPException(status_code=404, detail=f"пользователь '{name}' не найден")
-    if len(matches) > 1:
-        raise HTTPException(
-            status_code=409,
-            detail={"message": f"имя '{name}' неоднозначно", "users": matches},
-        )
-    updated = store.update_status(name, payload.status)
-    if updated is None:
-        # Гонка: между find_by_name и update_status появился дубликат имени.
-        raise HTTPException(
-            status_code=409,
-            detail={"message": f"имя '{name}' неоднозначно", "users": store.find_by_name(name)},
-        )
-    return updated
+@app.patch("/books/{title}")
+def rename_book(title: str, payload: NewTitleIn) -> dict:
+    try:
+        return store.rename(title, payload.new_title)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.delete("/books/{title}", status_code=204)
+def delete_book(title: str) -> None:
+    try:
+        store.delete(title)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.get("/stats")

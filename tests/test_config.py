@@ -13,7 +13,10 @@ def test_env_overrides_defaults(monkeypatch):
     get_settings.cache_clear()
 
 
-def test_db_path_default():
+def test_db_path_default(monkeypatch):
+    # conftest ставит AGENT_DB_PATH=.test-books.db на всю сессию pytest —
+    # убираем, чтобы проверить именно дефолт
+    monkeypatch.delenv("AGENT_DB_PATH", raising=False)
     get_settings.cache_clear()
     s = get_settings()
     assert s.db_path == "books.db"
