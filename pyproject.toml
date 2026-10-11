@@ -1,7 +1,7 @@
 [project]
 name = "api-agent"
 version = "0.1.0"
-description = "Минимальный LangChain-агент: естественный язык поверх HTTP API пользователей"
+description = "Минимальный LangChain-агент: естественный язык поверх HTTP API каталога книг (SQLite)"
 requires-python = ">=3.11"
 dependencies = [
     "langchain>=0.3",
