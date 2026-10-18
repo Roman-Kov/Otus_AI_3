@@ -10,6 +10,23 @@ Otus «Минимальный агент на LangChain».
 - API: FastAPI (в этом же репозитории)
 - Хранение: SQLite (файл из `AGENT_DB_PATH`, по умолчанию `books.db`)
 
+## Docker (одна команда)
+Нужен только Docker (на Windows — Docker Desktop). Python и Ollama на хосте не требуются.
+
+```powershell
+docker compose up --build -d
+```
+
+Поднимает API (`:8001`), Ollama с моделью `qwen2.5:3b` (первый запуск скачивает
+~2 ГБ) и volumes для модели и БД. Запрос агенту:
+
+```powershell
+docker compose run --rm agent "добавь книгу Мастер и Маргарита"
+```
+
+Остановка — `docker compose down` (модель и БД сохранятся в volumes).
+Модель можно переопределить: `$env:AGENT_LLM_MODEL="qwen2.5:1.5b"; docker compose up -d --build`.
+
 ## Настройка
 1. Python 3.11+
 2. Установить [Ollama](https://ollama.com), затем:

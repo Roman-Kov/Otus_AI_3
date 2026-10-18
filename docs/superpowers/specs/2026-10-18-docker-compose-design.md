@@ -43,7 +43,7 @@
 | `ollama` | `ollama/ollama` | LLM-движок | модели в named volume `ollama_models`; порт наружу не публикуется; healthcheck `ollama list` |
 | `ollama-init` | `ollama/ollama` | one-shot | `OLLAMA_HOST=http://ollama:11434`, команда `ollama pull qwen2.5:3b`; depends_on: `ollama` healthy; при повторных запусках мгновенно выходит |
 | `api` | сборка из `Dockerfile` | FastAPI | порты `8001:8001`; `AGENT_DB_PATH=/data/books.db`, БД в named volume `books_data`; healthcheck `GET /stats` через python/httpx; от Ollama не зависит |
-| `agent` | тот же образ | CLI-агент | profile `agent` (не стартует при обычном `up`); env `AGENT_OLLAMA_BASE_URL=http://ollama:11434`, `AGENT_API_BASE_URL=http://api:8001`, `AGENT_LLM_MODEL=qwen2.5:3b`; command `python main.py`; depends_on: `api` healthy + `ollama-init` completed_successfully |
+| `agent` | тот же образ | CLI-агент | profile `agent` (не стартует при обычном `up`); env `AGENT_OLLAMA_BASE_URL=http://ollama:11434`, `AGENT_API_BASE_URL=http://api:8001`, `AGENT_LLM_MODEL=qwen2.5:3b`; entrypoint `python main.py`; depends_on: `api` healthy + `ollama-init` completed_successfully |
 
 Модель можно переопределить переменной `AGENT_LLM_MODEL` (по умолчанию
 `qwen2.5:3b`): она параметризует и `ollama pull`, и env агента.
