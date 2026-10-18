@@ -12,3 +12,4 @@ dist/
 build/
 books.db
 .test-books.db
+.worktrees/
