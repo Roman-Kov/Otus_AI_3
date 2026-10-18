@@ -39,7 +39,8 @@ services:
   agent:
     build: .
     profiles: ["agent"]
-    command: ["python", "main.py"]
+    entrypoint: ["python", "main.py"]
+    command: []
     environment:
       AGENT_LLM_MODEL: ${AGENT_LLM_MODEL:-qwen2.5:3b}
       AGENT_OLLAMA_BASE_URL: http://ollama:11434

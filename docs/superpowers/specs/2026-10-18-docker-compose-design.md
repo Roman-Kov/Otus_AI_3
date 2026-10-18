@@ -56,8 +56,9 @@ docker compose run --rm agent "добавь книгу Мастер и Марг�
 docker compose down                                    # остановить (volumes сохранятся)
 ```
 
-`compose run` дописывает аргумент к `command` — агент получает запрос как
-`sys.argv[1]`, как и при локальном запуске.
+У агента `entrypoint: ["python", "main.py"]`: аргументы `compose run` становятся
+command и дописываются к entrypoint — агент получает запрос как `sys.argv[1]`,
+как и при локальном запуске.
 
 ## README
 
