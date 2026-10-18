@@ -1,0 +1,55 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  ollama-init:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["ollama pull ${AGENT_LLM_MODEL:-qwen2.5:3b}"]
+    restart: "no"
+
+  api:
+    build: .
+    environment:
+      AGENT_DB_PATH: /data/books.db
+    ports:
+      - "8001:8001"
+    volumes:
+      - books_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8001/stats')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  agent:
+    build: .
+    profiles: ["agent"]
+    command: ["python", "main.py"]
+    environment:
+      AGENT_LLM_MODEL: ${AGENT_LLM_MODEL:-qwen2.5:3b}
+      AGENT_OLLAMA_BASE_URL: http://ollama:11434
+      AGENT_API_BASE_URL: http://api:8001
+    depends_on:
+      api:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+
+volumes:
+  ollama_models:
+  books_data:

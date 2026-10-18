@@ -11,3 +11,4 @@ tests/
 report.md
 Dockerfile
 docker-compose.yml
+.worktrees/
